@@ -20,6 +20,15 @@ resource "aws_security_group" "default" {
   vpc_id = aws_vpc.main.id
 }
 
+resource "aws_security_group_rule" "default" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["10.0.0.0/32", "10.0.0.1/32"]
+  security_group_id = aws_security_group.default.id
+}
+
 resource "aws_ssm_parameter" "default" {
   name  = "/terraform/security-group-id"
   type  = "String"
