@@ -7,3 +7,6 @@ terraform -chdir="infra" init
 terraform -chdir="infra" apply -auto-approve
 ```
 
+```sh
+terraform -chdir="infra" destroy -auto-approve
+```
