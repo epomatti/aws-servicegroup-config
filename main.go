@@ -83,28 +83,30 @@ func authorizeRules(cfg aws.Config, groupId string) {
 	client := ec2.NewFromConfig(cfg)
 	port := int32(22)
 	ipPermissions := make([]types.IpPermission, 0)
+	ranges := make([]types.IpRange, 0)
 	for _, admin := range admins {
 		for _, ip := range admin.CidrBlocks {
+			println(ip)
 			ipRange := types.IpRange{
-				CidrIp: &ip,
+				// FIXME: This was bugging
+				// CidrIp: &ip,
+				CidrIp:      aws.String(ip),
+				Description: aws.String(admin.Name),
 			}
-			ranges := []types.IpRange{ipRange}
-			permission := types.IpPermission{
-				FromPort:   &port,
-				ToPort:     &port,
-				IpProtocol: aws.String("tcp"),
-				IpRanges:   ranges,
-			}
-			ipPermissions = append(ipPermissions, permission)
+			ranges = append(ranges, ipRange)
 		}
 	}
+	permission := types.IpPermission{
+		FromPort:   &port,
+		ToPort:     &port,
+		IpProtocol: aws.String("tcp"),
+		IpRanges:   ranges,
+	}
+	ipPermissions = append(ipPermissions, permission)
 	input := &ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId:       &groupId,
 		IpPermissions: ipPermissions,
 	}
-	// for _, i := range ipPermissions {
-	// 	println(fmt.Sprintf("%s", *i.IpRanges[0].CidrIp))
-	// }
 	_, err := client.AuthorizeSecurityGroupIngress(context.TODO(), input)
 	utils.Check(err)
 }
