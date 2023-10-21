@@ -19,8 +19,9 @@ func main() {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	utils.Check(err)
 
-	groupName := getGroupFromSSM(cfg)
-	revokeRules(cfg, groupName)
+	groupId := getGroupFromSSM(cfg)
+	revokeRules(cfg, groupId)
+	authorizeRules(cfg, groupId)
 }
 
 func loadEnvs() {
@@ -64,6 +65,10 @@ func revokeRules(cfg aws.Config, groupId string) {
 		}
 	}
 
+	if len(ingress) == 0 {
+		return
+	}
+
 	revokeInput := &ec2.RevokeSecurityGroupIngressInput{
 		SecurityGroupRuleIds: ingress,
 		GroupId:              &groupId,
@@ -73,14 +78,33 @@ func revokeRules(cfg aws.Config, groupId string) {
 	utils.Check(err)
 }
 
-// func updateGroup(cfg aws.Config, groupName string) {
-// 	client := ec2.NewFromConfig(cfg)
-
-// 	input := &ec2.DescribeSecurityGroupRulesInput{
-// 		groupName: groupName,
-// 	}
-
-// 	input := &ec2.StartInstancesInput{
-// 		InstanceIds: body.InstanceIds,
-// 	}
-// }
+func authorizeRules(cfg aws.Config, groupId string) {
+	admins := utils.ReadYaml()
+	client := ec2.NewFromConfig(cfg)
+	port := int32(22)
+	ipPermissions := make([]types.IpPermission, 0)
+	for _, admin := range admins {
+		for _, ip := range admin.CidrBlocks {
+			ipRange := types.IpRange{
+				CidrIp: &ip,
+			}
+			ranges := []types.IpRange{ipRange}
+			permission := types.IpPermission{
+				FromPort:   &port,
+				ToPort:     &port,
+				IpProtocol: aws.String("tcp"),
+				IpRanges:   ranges,
+			}
+			ipPermissions = append(ipPermissions, permission)
+		}
+	}
+	input := &ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId:       &groupId,
+		IpPermissions: ipPermissions,
+	}
+	// for _, i := range ipPermissions {
+	// 	println(fmt.Sprintf("%s", *i.IpRanges[0].CidrIp))
+	// }
+	_, err := client.AuthorizeSecurityGroupIngress(context.TODO(), input)
+	utils.Check(err)
+}
