@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"main/utils"
 
@@ -46,8 +47,8 @@ func getGroupFromSSM(cfg aws.Config) string {
 func revokeRules(cfg aws.Config, groupId string) {
 	client := ec2.NewFromConfig(cfg)
 
-	filterName := "group-id"
-	filters := []types.Filter{{Name: &filterName, Values: []string{groupId}}}
+	filterName := aws.String("group-id")
+	filters := []types.Filter{{Name: filterName, Values: []string{groupId}}}
 
 	input := &ec2.DescribeSecurityGroupRulesInput{
 		Filters: filters,
@@ -81,12 +82,12 @@ func revokeRules(cfg aws.Config, groupId string) {
 func authorizeRules(cfg aws.Config, groupId string) {
 	admins := utils.ReadYaml()
 	client := ec2.NewFromConfig(cfg)
-	port := int32(22)
+	port := aws.Int32(22)
+	ipProtocol := aws.String("tcp")
 	ipPermissions := make([]types.IpPermission, 0)
 	ranges := make([]types.IpRange, 0)
 	for _, admin := range admins {
 		for _, ip := range admin.CidrBlocks {
-			println(ip)
 			ipRange := types.IpRange{
 				// FIXME: This was bugging
 				// CidrIp: &ip,
@@ -97,9 +98,9 @@ func authorizeRules(cfg aws.Config, groupId string) {
 		}
 	}
 	permission := types.IpPermission{
-		FromPort:   &port,
-		ToPort:     &port,
-		IpProtocol: aws.String("tcp"),
+		FromPort:   port,
+		ToPort:     port,
+		IpProtocol: ipProtocol,
 		IpRanges:   ranges,
 	}
 	ipPermissions = append(ipPermissions, permission)
@@ -107,6 +108,8 @@ func authorizeRules(cfg aws.Config, groupId string) {
 		GroupId:       &groupId,
 		IpPermissions: ipPermissions,
 	}
-	_, err := client.AuthorizeSecurityGroupIngress(context.TODO(), input)
+	authorizeResponse, err := client.AuthorizeSecurityGroupIngress(context.TODO(), input)
 	utils.Check(err)
+
+	fmt.Println(authorizeResponse.Return)
 }
